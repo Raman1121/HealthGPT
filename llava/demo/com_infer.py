@@ -2,6 +2,11 @@ import os, sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 import copy
+import ast
+import numpy as np
+import pandas as pd
+import time
+from tqdm import tqdm
 from dataclasses import dataclass, field
 import json
 import logging
@@ -24,6 +29,9 @@ from packaging import version
 IS_TOKENIZER_GREATER_THAN_0_14 = version.parse(tokenizers.__version__) >= version.parse('0.14')
 from utils import find_all_linear_names, add_special_tokens_and_resize_model, load_weights, expand2square
 
+def get_labels_dict_from_string(x):
+    return ast.literal_eval(x)
+
 def infer():
     parser = argparse.ArgumentParser()
     parser.add_argument('--model_name_or_path', type=str, default='microsoft/Phi-3-mini-4k-instruct')
@@ -45,6 +53,17 @@ def infer():
     parser.add_argument('--top_p', type=float, default=None)
     parser.add_argument('--num_beams', type=int, default=1)
     parser.add_argument('--max_new_tokens', type=int, default=1024)
+
+    ## Custom args
+    parser.add_argument("--metadata_csv", type=str, required=True, help="Path to the metadata CSV file.")
+    parser.add_argument("--image_dir", type=str, required=True, help="Path to the image directory.")
+    parser.add_argument("--output_dir", type=str, required=True, help="Path to save the results.")
+    parser.add_argument("--image_col", type=str, default='synthetic_filename', help="Column for caption in the metadata file.")
+    parser.add_argument("--caption_col", type=str, default='annotated_prompt', help="Column for caption in the metadata file.")
+    parser.add_argument("--labels_col", type=str, default='chexpert_labels', help="Column for labels in the metadata file.")
+    parser.add_argument("--img_dir", type=str, default=None, help="Directory where images are located.")
+    parser.add_argument("--num_shards", type=int, default=None, help="Number of shards to divide the dataset into.")
+    parser.add_argument("--shard", type=int, default=None, help="Shard ID.")
     
     
 
@@ -90,37 +109,70 @@ def infer():
     model.eval()
     model.to(model_dtype).cuda()
 
-    question = args.question
-    img_path = args.img_path
+    ####
+    print("Loading Dataset...")
+    df = pd.read_csv(args.metadata_csv)
+    df[args.image_col] = df[args.image_col].apply(lambda x: os.path.join(args.image_dir, x))
 
-    if img_path:
-        qs = DEFAULT_IMAGE_TOKEN + '\n' + question
-    else:
-        qs = question
-    conv = conversation_lib.conv_templates[args.instruct_template].copy()
-    conv.append_message(conv.roles[0], qs)
-    conv.append_message(conv.roles[1], None)
-    prompt = conv.get_prompt()
-    input_ids = tokenizer_image_token(prompt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt').cuda().unsqueeze_(0)
-    if img_path:
-        image = Image.open(img_path).convert('RGB')
-        image = expand2square(image, tuple(int(x*255) for x in model.get_vision_tower().image_processor.image_mean))
-        image_tensor = model.get_vision_tower().image_processor.preprocess(image, return_tensors='pt')['pixel_values'][0].unsqueeze_(0)
-    with torch.inference_mode():
-        output_ids = model.base_model.model.generate(
-        input_ids,
-        images=image_tensor.to(dtype=model_dtype, device='cuda', non_blocking=True) if img_path else None,
-        image_sizes=image.size if img_path else None,
-        do_sample=args.do_sample,
-        temperature=args.temperature,
-        top_p=args.top_p,
-        num_beams=args.num_beams,
-        max_new_tokens=args.max_new_tokens,
-        use_cache=True)
-    
-    response = tokenizer.decode(output_ids[0], skip_special_tokens=True)[:-8]
-    print(f'Q: {question}')
-    print(f'HealthGPT: {response}')
+    try:
+        df[args.labels_col] = df[args.labels_col].apply(lambda x: get_labels_dict_from_string(x))
+    except:
+        pass
+
+    if(args.num_shards is not None and args.shard is not None):
+        all_shards = np.array_split(df, args.num_shards)
+        df = all_shards[args.shard].reset_index(drop=True)
+        print("Shard {} of {} loaded.".format(args.shard, args.num_shards))
+
+    print("Loaded {} samples.".format(len(df)))
+    print("Done!")
+
+    META_PROMPT = "You are an expert radiologist and medical annotator. Your task is to assess the quality of an image given its description and classify the image as either 'High Quality', 'Medium Quality', or 'Low Quality'. Keep your responses limited to only these three options. If the image is not relevant to the description, respond with 'Not Relevant'. \n" 
+
+    start_time = time.time()
+
+    ALL_RESPONSES = []
+    for i in tqdm(range(len(df))):
+        question = "{} Given the prompt {}, classify the following image as 'High Quality', 'Medium Quality', or 'Low Quality'".format(META_PROMPT, prompt)
+        img_path = df[args.image_col].iloc[i]
+
+        # question = args.question
+        # img_path = args.img_path
+
+        if img_path:
+            qs = DEFAULT_IMAGE_TOKEN + '\n' + question
+        else:
+            qs = question
+        conv = conversation_lib.conv_templates[args.instruct_template].copy()
+        conv.append_message(conv.roles[0], qs)
+        conv.append_message(conv.roles[1], None)
+        prompt = conv.get_prompt()
+        input_ids = tokenizer_image_token(prompt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt').cuda().unsqueeze_(0)
+        if img_path:
+            image = Image.open(img_path).convert('RGB')
+            image = expand2square(image, tuple(int(x*255) for x in model.get_vision_tower().image_processor.image_mean))
+            image_tensor = model.get_vision_tower().image_processor.preprocess(image, return_tensors='pt')['pixel_values'][0].unsqueeze_(0)
+        with torch.inference_mode():
+            output_ids = model.base_model.model.generate(
+            input_ids,
+            images=image_tensor.to(dtype=model_dtype, device='cuda', non_blocking=True) if img_path else None,
+            image_sizes=image.size if img_path else None,
+            do_sample=args.do_sample,
+            temperature=args.temperature,
+            top_p=args.top_p,
+            num_beams=args.num_beams,
+            max_new_tokens=args.max_new_tokens,
+            use_cache=True)
+        
+        response = tokenizer.decode(output_ids[0], skip_special_tokens=True)[:-8]
+        print(f'Q: {question}')
+        print(f'HealthGPT: {response}')
+
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print(f"Elapsed time: {elapsed_time / 3600:.2f} hours")
+    print(f"Elapsed time: {elapsed_time / 60:.2f} minutes")
+    print(f"Elapsed time: {elapsed_time:.2f} seconds")
 
 
 if __name__ == "__main__":
