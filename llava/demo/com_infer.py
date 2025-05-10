@@ -133,6 +133,10 @@ def infer():
 
     ALL_RESPONSES = []
     for i in tqdm(range(len(df))):
+        if i % 100 == 0:
+            print(f"Processing sample {i}/{len(df)}...")
+
+        prompt = df[args.caption_col].iloc[i]
         question = "{} Given the prompt {}, classify the following image as 'High Quality', 'Medium Quality', or 'Low Quality'".format(META_PROMPT, prompt)
         img_path = df[args.image_col].iloc[i]
 
