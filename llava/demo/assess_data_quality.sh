@@ -11,7 +11,7 @@ IMAGE_COL="synthetic_filename"
 CAPTION_COL="annotated_prompt"
 LABELS_COL="chexpert_labels"
 
-NUM_SHARDS=10000
+NUM_SHARDS=5
 SHARD=0
 
 # Path to the HLORA and Fusion Layer files
