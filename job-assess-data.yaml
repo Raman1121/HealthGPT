@@ -112,7 +112,7 @@ spec:
               echo "Running Assessment!!!"
               cd llava/demo/
               chmod +x assess_data_quality.sh
-              ./assess_data_quality.sh > log_assess_data_quality_shard_3.txt 2>&1
+              ./assess_data_quality.sh > log_assess_data_quality_shard_4.txt 2>&1
 
 
           resources:
