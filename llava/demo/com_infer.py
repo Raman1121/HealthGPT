@@ -167,12 +167,27 @@ def infer():
         response = tokenizer.decode(output_ids[0], skip_special_tokens=True)[:-8]
         print(f'Q: {question}')
         print(f'HealthGPT: {response}')
+        ALL_RESPONSES.append(response)
+
+    df['Image Quality'] = ALL_RESPONSES
+    print("Saving results to CSV...")
+
+    if(args.num_shards is not None and args.shard is not None):
+        filename = "metadata_with_quality_shard_{}.csv".format(args.shard)
+    else:
+        filename = "metadata_with_quality.csv"
+
+    df.to_csv(os.path.join(args.output_dir, filename), index=False)
+    print(f"Results saved to: {os.path.join(args.output_dir, filename)}")
+    print("Done!")
 
     end_time = time.time()
     elapsed_time = end_time - start_time
     print(f"Elapsed time: {elapsed_time / 3600:.2f} hours")
     print(f"Elapsed time: {elapsed_time / 60:.2f} minutes")
     print(f"Elapsed time: {elapsed_time:.2f} seconds")
+
+    
 
 
 if __name__ == "__main__":
