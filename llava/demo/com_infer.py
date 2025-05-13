@@ -175,7 +175,7 @@ def infer():
         print(f'HealthGPT: {response}')
         ALL_RESPONSES.append(response)
 
-    df['Image Quality'] = ALL_RESPONSES
+    df['Valid Image'] = ALL_RESPONSES
     print("Saving results to CSV...")
 
     if(args.num_shards is not None and args.shard is not None):
