@@ -113,6 +113,7 @@ def infer():
     print("Loading Dataset...")
     df = pd.read_csv(args.metadata_csv)
     df[args.image_col] = df[args.image_col].apply(lambda x: os.path.join(args.image_dir, x))
+    df[args.image_col] = df[args.image_col].str.replace("sana_epoch50/","")
 
     try:
         df[args.labels_col] = df[args.labels_col].apply(lambda x: get_labels_dict_from_string(x))
