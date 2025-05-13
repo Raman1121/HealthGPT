@@ -12,7 +12,7 @@ CAPTION_COL="annotated_prompt"
 LABELS_COL="chexpert_labels"
 
 NUM_SHARDS=6
-SHARD=6
+SHARD=5
 
 # Path to the HLORA and Fusion Layer files
 HLORA_PATH="/pvc/HealthGPT_model_weights/com_hlora_weights.bin"
