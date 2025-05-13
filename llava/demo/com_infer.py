@@ -127,8 +127,8 @@ def infer():
     print("Loaded {} samples.".format(len(df)))
     print("Done!")
 
-    META_PROMPT = "You are an expert radiologist and medical annotator. Your task is to assess the quality of an image given its description and classify the image as either 'High Quality', 'Medium Quality', or 'Low Quality'. Keep your responses limited to only these three options. If the image is not relevant to the description, respond with 'Not Relevant'. \n" 
-
+    # META_PROMPT = "You are an expert radiologist and medical annotator. Your task is to assess the quality of an image given its description and classify the image as either 'High Quality', 'Medium Quality', or 'Low Quality'. Keep your responses limited to only these three options. If the image is not relevant to the description, respond with 'Not Relevant'. \n" 
+    META_PROMPT = "Your task is to check if an image contains an X-ray or not. If yes, return with 'Yes, otherwise return with 'No'. If you encounter a black image, return with 'No'.\n"
     start_time = time.time()
 
     ALL_RESPONSES = []
@@ -137,7 +137,8 @@ def infer():
             print(f"Processing sample {i}/{len(df)}...")
 
         prompt = df[args.caption_col].iloc[i]
-        question = "{} Given the prompt {}, classify the following image as 'High Quality', 'Medium Quality', or 'Low Quality'".format(META_PROMPT, prompt)
+        # question = "{} Given the prompt {}, classify the following image as 'High Quality', 'Medium Quality', or 'Low Quality'".format(META_PROMPT, prompt)
+        question = META_PROMPT
         img_path = df[args.image_col].iloc[i]
 
         # question = args.question
