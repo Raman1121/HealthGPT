@@ -110,9 +110,10 @@ spec:
               ./hf-login.sh
 
               echo "Running Assessment!!!"
-              cd llava/demo/
-              chmod +x assess_data_quality_shard0.sh
-              ./assess_data_quality_shard0.sh > log_assess_data_quality_shard0.txt 2>&1
+              # cd llava/demo/
+              # chmod +x assess_data_quality_shard0.sh
+              # ./assess_data_quality_shard0.sh > log_assess_data_quality_shard0.txt 2>&1
+              sleep infinity
 
 
           resources:
